@@ -15,9 +15,11 @@ if (!fs.existsSync(opusDir)) {
 
 const files = [];
 
+let previousAudio;
+
 async function init() {
     try {
-        await converter.convert(audioDir, opusDir);
+        await converter.convert(audioDir, opusDir, 32, 0, true);
     } catch (err) {
         return console.error(err);
     }
@@ -66,24 +68,27 @@ async function respondPlay(message) {
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
         message.channel.send("join a voice channel first");
-        return setTimeout(() => {
-            message.channel.send("cunt");
-        }, 1000);
     }
 
     const permissions = voiceChannel.permissionsFor(message.client.user);
     if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
-        return message.channel.send(smiley(sad) + " somebody pls give me permission to join voice channels.");
+        return message.channel.send("need permission to join voice channels somehow.");
     }
 
     // Join voice channel
     const connection = await voiceChannel.join();
 
+    let index = Math.floor(Math.random() * files.length);
+    while (files.length > 1 && index == previousAudio) {
+        index = Math.floor(Math.random() * files.length);
+    }
+    previousAudio = index;
+
     const audio = files[Math.floor(Math.random() * files.length)];
     console.log("Playing some sweet " + audio);
 
     const dispatcher = connection.play(opusDir + audio, {
-        volume: 0.8,
+        volume: 0.7,
     })
         .on("finish", async () => {
             connection.disconnect();
