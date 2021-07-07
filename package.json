@@ -1,0 +1,16 @@
+{
+  "name": "discord_stfu",
+  "version": "1.0.0",
+  "description": "A discord bot used for throwing in a quick \"shut up\" whenever you wish.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/opus": "^0.3.3",
+    "discord.js": "^12.5.1",
+    "fluent-ffmpeg": "^2.1.2"
+  }
+}
