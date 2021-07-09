@@ -90,6 +90,7 @@ async function respondPlay(message) {
         });
         return setTimeout(() => {
             msg.delete();
+            message.react("🖕");
         }, 3000);
     }
 
