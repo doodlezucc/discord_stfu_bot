@@ -14,10 +14,27 @@ if (!fs.existsSync(opusDir)) {
 }
 
 const files = [];
+const client = new Discord.Client();
 
 let previousAudio;
 
+
+async function clearConversions() {
+    for (const dirent of fs.readdirSync(opusDir, { withFileTypes: true })) {
+        if (dirent.isFile() && dirent.name.endsWith(".opus")) {
+            await new Promise((resolve) => {
+                fs.unlink(opusDir + dirent.name, () => {
+                    resolve();
+                });
+            })
+        }
+    }
+}
+
 async function init() {
+    await clearConversions();
+    console.log("Cleared conversions");
+
     try {
         await converter.convert(audioDir, opusDir, 32, 0, true);
     } catch (err) {
@@ -32,7 +49,6 @@ async function init() {
 
     const { token } = require("../config.json");
 
-    const client = new Discord.Client();
     client.login(token);
 
     client.once("ready", () => {
@@ -59,15 +75,22 @@ async function init() {
 init();
 
 /** @param {Discord.Message} message */
-async function handleMessage(message) {
-    respondPlay(message);
+function handleMessage(message) {
+    if (message.content === "stfu") {
+        respondPlay(message);
+    }
 }
 
 /** @param {Discord.Message} message */
 async function respondPlay(message) {
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
-        message.channel.send("join a voice channel first");
+        const msg = await message.channel.send("", {
+            files: ["https://i.redd.it/yb7dlj86tiv61.png"]
+        });
+        return setTimeout(() => {
+            msg.delete();
+        }, 3000);
     }
 
     const permissions = voiceChannel.permissionsFor(message.client.user);
@@ -84,7 +107,7 @@ async function respondPlay(message) {
     }
     previousAudio = index;
 
-    const audio = files[Math.floor(Math.random() * files.length)];
+    const audio = files[index];
     console.log("Playing some sweet " + audio);
 
     const dispatcher = connection.play(opusDir + audio, {
