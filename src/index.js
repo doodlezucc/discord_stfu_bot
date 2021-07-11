@@ -13,11 +13,18 @@ if (!fs.existsSync(opusDir)) {
     fs.mkdirSync(opusDir);
 }
 
-const files = [];
 const client = new Discord.Client();
+const {
+    token,
+    amp
+} = require("../config.json");
 
+
+/** @type {converter.AudioCommand[]} */
+let commands;
+
+/** @type {number} */
 let previousAudio;
-
 
 async function clearConversions() {
     for (const dirent of fs.readdirSync(opusDir, { withFileTypes: true })) {
@@ -36,18 +43,10 @@ async function init() {
     console.log("Cleared conversions");
 
     try {
-        await converter.convert(audioDir, opusDir, 32, 0, true);
+        commands = await converter.convert(audioDir, opusDir, amp, 8, true);
     } catch (err) {
         return console.error(err);
     }
-
-    for (const dirent of fs.readdirSync(opusDir, { withFileTypes: true })) {
-        if (dirent.isFile() && dirent.name.endsWith(".opus")) {
-            files.push(dirent.name);
-        }
-    }
-
-    const { token } = require("../config.json");
 
     client.login(token);
 
@@ -76,13 +75,18 @@ init();
 
 /** @param {Discord.Message} message */
 function handleMessage(message) {
-    if (message.content === "stfu") {
-        respondPlay(message);
+    for (const cmd of commands) {
+        if (message.content === cmd.folder) {
+            return respondPlay(message, cmd);
+        }
     }
 }
 
-/** @param {Discord.Message} message */
-async function respondPlay(message) {
+/** 
+ * @param {Discord.Message} message
+ * @param {converter.AudioCommand} cmd
+*/
+async function respondPlay(message, cmd) {
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
         const msg = await message.channel.send("", {
@@ -101,17 +105,18 @@ async function respondPlay(message) {
 
     // Join voice channel
     const connection = await voiceChannel.join();
+    const files = cmd.files;
 
     let index = Math.floor(Math.random() * files.length);
-    while (files.length > 1 && index == previousAudio) {
+    while (files.length > 1 && index == cmd.previousAudio) {
         index = Math.floor(Math.random() * files.length);
     }
-    previousAudio = index;
+    cmd.previousAudio = index;
 
     const audio = files[index];
     console.log("Playing some sweet " + audio);
 
-    const dispatcher = connection.play(opusDir + audio, {
+    const dispatcher = connection.play(audio, {
         volume: 0.7,
     })
         .on("finish", async () => {
