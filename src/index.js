@@ -85,19 +85,41 @@ function handleMessage(message) {
     }
 }
 
+/** @param {Discord.TextChannel} channel */
+async function lots_of_messages_getter(channel, limit = 500) {
+    const sum_messages = [];
+    let last_id;
+
+    while (true) {
+        const options = { limit: 100 };
+        if (last_id) {
+            options.before = last_id;
+        }
+
+        const messages = await channel.messages.fetch(options);
+        sum_messages.push(...messages.array());
+        last_id = messages.last().id;
+
+        if (messages.size != 100 || sum_messages >= limit) {
+            break;
+        }
+    }
+
+    return sum_messages;
+}
+
 /** @param {Discord.Message} message */
 async function respondStats(message) {
-    /** @type {Discord.TextChannel} */
     const channel = message.channel;
 
     // `m` is a message object that will be passed through the filter function
-    const messages = await channel.messages.fetch();
+    const messages = await lots_of_messages_getter(channel, 3000);
 
     let msg = statsHeader;
     for (const cmd of commands) {
         let count = 0;
 
-        for (const m of messages.values()) {
+        for (const m of messages) {
             if (m.content === cmd.folder) {
                 count++;
             }
