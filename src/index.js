@@ -16,15 +16,14 @@ if (!fs.existsSync(opusDir)) {
 const client = new Discord.Client();
 const {
     token,
-    amp
+    amp,
+    cowardImg,
+    statsHeader
 } = require("../config.json");
 
 
 /** @type {converter.AudioCommand[]} */
 let commands;
-
-/** @type {number} */
-let previousAudio;
 
 async function clearConversions() {
     for (const dirent of fs.readdirSync(opusDir, { withFileTypes: true })) {
@@ -75,11 +74,39 @@ init();
 
 /** @param {Discord.Message} message */
 function handleMessage(message) {
+    if (message.content === "soundstats") {
+        return respondStats(message);
+    }
+
     for (const cmd of commands) {
         if (message.content === cmd.folder) {
             return respondPlay(message, cmd);
         }
     }
+}
+
+/** @param {Discord.Message} message */
+async function respondStats(message) {
+    /** @type {Discord.TextChannel} */
+    const channel = message.channel;
+
+    // `m` is a message object that will be passed through the filter function
+    const messages = await channel.messages.fetch();
+
+    let msg = statsHeader;
+    for (const cmd of commands) {
+        let count = 0;
+
+        for (const m of messages.values()) {
+            if (m.content === cmd.folder) {
+                count++;
+            }
+        }
+
+        msg += "\n" + cmd.folder + ": " + count;
+    }
+
+    channel.send(msg);
 }
 
 /** 
@@ -90,7 +117,7 @@ async function respondPlay(message, cmd) {
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
         const msg = await message.channel.send("", {
-            files: ["https://i.redd.it/yb7dlj86tiv61.png"]
+            files: [cowardImg]
         });
         return setTimeout(() => {
             msg.delete();
