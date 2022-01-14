@@ -46,7 +46,7 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
                 if (audio.isFile()) {
                     let dest = audio.name;
                     if (dest.includes(".")) {
-                        dest = dest.substr(0, dest.lastIndexOf("."));
+                        dest = dest.substring(0, dest.lastIndexOf("."));
                     }
                     dest = output + dest + ".opus";
 
