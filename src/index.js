@@ -31,22 +31,17 @@ const {
     statsHeader
 } = require("../config.json");
 
-const statsPath = "../stats.json";
+const statsPath = "./stats.json";
 let soundStats = {}
 
 function loadStats() {
     if (fs.existsSync(statsPath)) {
         soundStats = JSON.parse(fs.readFileSync(statsPath));
     }
-    for (const cmd of commands) {
-        if (!(cmd.folder in soundStats)) {
-            soundStats[cmd.folder] = 0
-        }
-    }
 }
 
 function saveStats() {
-    fs.writeFile(statsPath, JSON.stringify(soundStats));
+    fs.writeFile(statsPath, JSON.stringify(soundStats), () => { });
 }
 
 
@@ -116,44 +111,20 @@ function handleMessage(message) {
     }
 }
 
-/** @param {Discord.TextChannel} channel */
-async function lotsOfMessagesGetter(channel, limit = 500) {
-    const sum_messages = [];
-    let last_id;
-
-    while (true) {
-        const options = { limit: 100 };
-        if (last_id) {
-            options.before = last_id;
-        }
-
-        const messages = await channel.messages.fetch(options);
-        sum_messages.push(...messages.array());
-        last_id = messages.last().id;
-
-        if (messages.size != 100 || sum_messages >= limit) {
-            break;
-        }
-    }
-
-    return sum_messages;
-}
-
 /** @param {Discord.Message} message */
 async function respondStats(message) {
     const channel = message.channel;
 
-    // `m` is a message object that will be passed through the filter function
-    const messages = await lotsOfMessagesGetter(channel, 3000);
+    if (!(channel.guildId in soundStats)) {
+        soundStats[channel.guildId] = {};
+    }
 
     let msg = statsHeader;
     for (const cmd of commands) {
         let count = 0;
 
-        for (const m of messages) {
-            if (m.content === cmd.folder) {
-                count++;
-            }
+        if (cmd.folder in soundStats[channel.guildId]) {
+            count = soundStats[channel.guildId][cmd.folder];
         }
 
         msg += "\n" + cmd.folder + ": " + count;
@@ -176,6 +147,10 @@ async function respondPlay(message, cmd) {
             msg.delete();
             message.react("🖕");
         }, 3000);
+    }
+
+    if (!(voiceChannel.guildId in soundStats)) {
+        soundStats[voiceChannel.guildId] = {};
     }
 
     const permissions = voiceChannel.permissionsFor(message.client.user);
@@ -209,9 +184,15 @@ async function respondPlay(message, cmd) {
 
     const player = Voice.createAudioPlayer();
     player.addListener("stateChange", (_oldState, newState) => {
-        console.log(newState.status);
         if (newState.status == Voice.AudioPlayerStatus.Idle) {
             connection.disconnect();
+
+            if (!(cmd.folder in soundStats[voiceChannel.guildId])) {
+                soundStats[voiceChannel.guildId][cmd.folder] = 0;
+            }
+            soundStats[voiceChannel.guildId][cmd.folder]++;
+
+            saveStats();
         }
     }).addListener("error", (err) => {
         connection.disconnect();
