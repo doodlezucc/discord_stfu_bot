@@ -62,10 +62,10 @@ async function clearConversions() {
 
 async function init() {
     //await clearConversions();
-    //console.log("Cleared conversions");
+    console.log("Cleared conversions");
 
     try {
-        commands = await converter.convert(audioDir, opusDir, amp, 8, false); // TODO false -> true
+        commands = await converter.convert(audioDir, opusDir, amp, 8);
     } catch (err) {
         return console.error(err);
     }
@@ -79,7 +79,7 @@ async function init() {
         console.log("Ready!");
 
         client.user.setPresence({
-            status: "online"
+            status: "invisible"
         });
     });
     client.on("reconnecting", () => {
@@ -141,11 +141,11 @@ async function respondPlay(message, cmd) {
     let changeNick = true;
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
-        const msg = await message.channel.send("", {
+        const reply = await message.channel.send({
             files: [cowardImg]
         });
         return setTimeout(() => {
-            msg.delete();
+            reply.delete();
             message.react("🖕");
         }, 3000);
     }
@@ -155,16 +155,22 @@ async function respondPlay(message, cmd) {
     function nextNick(index, instant) {
         if (!changeNick) return;
 
+        const guild = voiceChannel.guild;
+        const mem = members.at(index % members.size);
+        const nick = mem.nickname ?? mem.displayName;
+
+        if (instant) {
+            client.user.setAvatar(mem.displayAvatarURL()).catch(reason => {
+                console.log("Failed to change avatar: " + reason);
+            });
+        }
+
         setTimeout(async () => {
-            const guild = voiceChannel.guild;
-            const mem = members.at(index % members.size);
-            const nick = mem.nickname ?? mem.displayName;
-            console.log(nick);
             await guild.members.edit(client.user, {
-                nick: nick
+                nick: nick,
             });
             nextNick(index + 1, false);
-        }, instant ? 0 : 500);
+        }, instant ? 0 : 100);
     }
 
     nextNick(Math.floor(Math.random() * members.size), true);
