@@ -138,7 +138,6 @@ async function respondStats(message) {
  * @param {converter.AudioCommand} cmd
 */
 async function respondPlay(message, cmd) {
-    let changeNick = true;
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
         const reply = await message.channel.send({
@@ -149,32 +148,6 @@ async function respondPlay(message, cmd) {
             message.react("🖕");
         }, 3000);
     }
-
-    const members = voiceChannel.members;
-
-    function nextNick(index, instant) {
-        if (!changeNick) return;
-
-        const guild = voiceChannel.guild;
-        const mem = members.at(index % members.size);
-        const nick = mem.nickname ?? mem.displayName;
-
-        if (instant) {
-            client.user.setAvatar(mem.displayAvatarURL()).catch(reason => {
-                console.log("Failed to change avatar: " + reason);
-            });
-        }
-
-        setTimeout(async () => {
-            await guild.members.edit(client.user, {
-                nick: nick,
-            });
-            nextNick(index + 1, false);
-        }, instant ? 0 : 100);
-    }
-
-    nextNick(Math.floor(Math.random() * members.size), true);
-
 
     if (!(voiceChannel.guildId in soundStats)) {
         soundStats[voiceChannel.guildId] = {};
@@ -199,7 +172,7 @@ async function respondPlay(message, cmd) {
     const resource = Voice.createAudioResource(audio, {
         inlineVolume: true,
     });
-    resource.volume.setVolume(0.15);
+    resource.volume.setVolume(0.12);
 
     const connection = Voice.joinVoiceChannel({
         channelId: voiceChannel.id,
@@ -213,7 +186,6 @@ async function respondPlay(message, cmd) {
     player.addListener("stateChange", (_oldState, newState) => {
         if (newState.status == Voice.AudioPlayerStatus.Idle) {
             connection.disconnect();
-            changeNick = false;
 
             if (!(cmd.folder in soundStats[voiceChannel.guildId])) {
                 soundStats[voiceChannel.guildId][cmd.folder] = 0;
