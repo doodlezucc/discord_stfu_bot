@@ -65,13 +65,12 @@ async function init() {
     console.log("Cleared conversions");
 
     try {
-        commands = await converter.convert(audioDir, opusDir, amp, 8);
+        commands = await converter.convert(audioDir, opusDir, amp, 8, false);
     } catch (err) {
         return console.error(err);
     }
 
     loadStats();
-    console.log(soundStats);
 
     client.login(token);
 
@@ -119,6 +118,10 @@ async function respondStats(message) {
         soundStats[channel.guildId] = {};
     }
 
+    const nameLength = commands.reduce((v, cmd) => Math.max(v, cmd.folder.length), 0);
+    const maxClips = commands.reduce((v, cmd) => Math.max(v, cmd.files.length), 0);
+    const maxClipsLen = (maxClips + "").length;
+
     let msg = statsHeader;
     for (const cmd of commands) {
         let count = 0;
@@ -127,7 +130,10 @@ async function respondStats(message) {
             count = soundStats[channel.guildId][cmd.folder];
         }
 
-        msg += "\n" + cmd.folder + ": " + count;
+        const clips = (cmd.files.length + "");
+        const namePad = cmd.folder.padStart(nameLength + 1 - clips.length);
+        const countPad = ("" + count).padStart(maxClipsLen);
+        msg += "\n`" + namePad + "(" + cmd.files.length + "): " + countPad + "`";
     }
 
     channel.send(msg);

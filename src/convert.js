@@ -4,6 +4,7 @@ const { join } = require("path");
 
 class AudioCommand {
     constructor(folder) {
+        /** @type {string} */
         this.folder = folder;
 
         /** @type {string[]} */
