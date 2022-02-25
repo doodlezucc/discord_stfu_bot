@@ -3,6 +3,7 @@ const Voice = require("@discordjs/voice");
 
 const fs = require("fs");
 const converter = require("./convert");
+const { Connection } = require("./wheel");
 
 const audioDir = "audio/";
 if (!fs.existsSync(audioDir)) {
@@ -58,11 +59,11 @@ async function clearConversions() {
             })
         }
     }
+    console.log("Cleared conversions");
 }
 
 async function init() {
     //await clearConversions();
-    console.log("Cleared conversions");
 
     try {
         commands = await converter.convert(audioDir, opusDir, amp, 8, false);
@@ -139,6 +140,16 @@ async function respondStats(message) {
     channel.send(msg);
 }
 
+/** @type {Object.<string, Connection>} */
+const connections = {};
+
+function getConnection(guildId) {
+    if (!(guildId in connections)) {
+        connections[guildId] = new Connection();
+    }
+    return connections[guildId];
+}
+
 /** 
  * @param {Discord.Message} message
  * @param {converter.AudioCommand} cmd
@@ -155,8 +166,10 @@ async function respondPlay(message, cmd) {
         }, 3000);
     }
 
-    if (!(voiceChannel.guildId in soundStats)) {
-        soundStats[voiceChannel.guildId] = {};
+    const guildId = voiceChannel.guildId;
+
+    if (!(guildId in soundStats)) {
+        soundStats[guildId] = {};
     }
 
     const permissions = voiceChannel.permissionsFor(message.client.user);
@@ -164,15 +177,7 @@ async function respondPlay(message, cmd) {
         return message.channel.send("need permission to join voice channels somehow.");
     }
 
-    const files = cmd.files;
-
-    let index = Math.floor(Math.random() * files.length);
-    while (files.length > 1 && index == cmd.previousAudio) {
-        index = Math.floor(Math.random() * files.length);
-    }
-    cmd.previousAudio = index;
-
-    const audio = files[index];
+    const audio = getConnection(guildId).getSound(cmd);
     console.log("Playing some sweet " + audio);
 
     const resource = Voice.createAudioResource(audio, {
@@ -182,7 +187,7 @@ async function respondPlay(message, cmd) {
 
     const connection = Voice.joinVoiceChannel({
         channelId: voiceChannel.id,
-        guildId: voiceChannel.guildId,
+        guildId: guildId,
         adapterCreator: voiceChannel.guild.voiceAdapterCreator,
         selfMute: false,
         selfDeaf: false,
@@ -193,10 +198,10 @@ async function respondPlay(message, cmd) {
         if (newState.status == Voice.AudioPlayerStatus.Idle) {
             connection.disconnect();
 
-            if (!(cmd.folder in soundStats[voiceChannel.guildId])) {
-                soundStats[voiceChannel.guildId][cmd.folder] = 0;
+            if (!(cmd.folder in soundStats[guildId])) {
+                soundStats[guildId][cmd.folder] = 0;
             }
-            soundStats[voiceChannel.guildId][cmd.folder]++;
+            soundStats[guildId][cmd.folder]++;
 
             saveStats();
         }
