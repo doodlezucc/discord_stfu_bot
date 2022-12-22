@@ -119,22 +119,31 @@ async function respondStats(message) {
         soundStats[channel.guildId] = {};
     }
 
+    const channelStats = soundStats[channel.guildId];
+
+    let maxPlays = 0;
+    for (const cmd of commands) {
+        if (!(cmd.folder in channelStats)) {
+            channelStats[cmd.folder] = 0;
+        }
+
+        const plays = channelStats[cmd.folder];
+        if (plays > maxPlays) {
+            maxPlays = plays;
+        }
+    }
+
     const nameLength = commands.reduce((v, cmd) => Math.max(v, cmd.folder.length), 0);
-    const maxClips = commands.reduce((v, cmd) => Math.max(v, cmd.files.length), 0);
-    const maxClipsLen = (maxClips + "").length;
+    const maxPlaysLen = (maxPlays + "").length;
 
     let msg = statsHeader;
     for (const cmd of commands) {
-        let count = 0;
-
-        if (cmd.folder in soundStats[channel.guildId]) {
-            count = soundStats[channel.guildId][cmd.folder];
-        }
+        const plays = channelStats[cmd.folder];
 
         const clips = (cmd.files.length + "");
         const namePad = cmd.folder.padStart(nameLength + 1 - clips.length);
-        const countPad = ("" + count).padStart(maxClipsLen);
-        msg += "\n`" + namePad + "(" + cmd.files.length + "): " + countPad + "`";
+        const playsPad = ("" + plays).padStart(maxPlaysLen);
+        msg += "\n`" + namePad + "(" + cmd.files.length + "): " + playsPad + "`";
     }
 
     channel.send(msg);
@@ -178,7 +187,7 @@ async function respondPlay(message, cmd) {
     }
 
     const audio = getConnection(guildId).getSound(cmd);
-    console.log("Playing some sweet " + audio);
+    // console.log("Playing some sweet " + audio);
 
     const resource = Voice.createAudioResource(audio, {
         inlineVolume: true,
