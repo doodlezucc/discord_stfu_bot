@@ -1,6 +1,7 @@
 const { AudioCommand } = require("./convert");
 
-const timeUntilReset = 5 * 60 * 1000;
+// 20 minutes
+const timeUntilReset = 20 * 60 * 1000;
 
 class Wheel {
     /**
