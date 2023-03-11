@@ -4,14 +4,14 @@
   "description": "A discord bot used for throwing in a quick \"shut up\" whenever you wish.",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/index.js"
   },
-  "author": "",
+  "author": "doodlezucc",
   "license": "ISC",
   "dependencies": {
     "@discordjs/opus": "^0.9.0",
-    "@discordjs/voice": "^0.7.5",
-    "discord.js": "^13.6.0",
+    "@discordjs/voice": "^0.14.0",
+    "discord.js": "^14.7.1",
     "fluent-ffmpeg": "^2.1.2",
     "libsodium-wrappers": "^0.7.9"
   }

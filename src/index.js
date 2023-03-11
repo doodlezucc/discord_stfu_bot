@@ -18,10 +18,11 @@ if (!fs.existsSync(opusDir)) {
 
 const client = new Discord.Client({
     intents: [
-        "GUILDS",
-        "GUILD_MESSAGES",
-        "GUILD_MESSAGE_REACTIONS",
-        "GUILD_VOICE_STATES",
+        "Guilds",
+        "GuildMessages",
+        "GuildMessageReactions",
+        "GuildVoiceStates",
+        "MessageContent"
     ],
 });
 
@@ -182,7 +183,7 @@ async function respondPlay(message, cmd) {
     }
 
     const permissions = voiceChannel.permissionsFor(message.client.user);
-    if (!permissions.has("CONNECT") || !permissions.has("SPEAK")) {
+    if (!permissions.has("Connect") || !permissions.has("Speak")) {
         return message.channel.send("need permission to join voice channels somehow.");
     }
 
