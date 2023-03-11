@@ -73,16 +73,15 @@ async function clearConversions() {
 
 async function init() {
     initDirectories();
-    //await clearConversions();
+    // await clearConversions();
 
     const doNormalize = normalize ?? true;
 
     if (doNormalize) {
         await converter.normalize(rawDir, audioDir);
-        return;
     }
 
-    commands = await converter.convert(audioDir, opusDir, amp, 8, false);
+    commands = await converter.convert(audioDir, opusDir, amp, 0);
 
     loadStats();
 

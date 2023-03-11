@@ -16,6 +16,44 @@ class AudioCommand {
 exports.AudioCommand = AudioCommand;
 
 /**
+ * Runs ffmpeg with specified filters and converts from `input` to `output` (opus format).
+ * @param {String} input
+ * @param {String} output
+ * @param {() => any} onWrite
+ * @param {String[]} filters
+ * @returns {Promise<String>}
+ */
+async function runFFmpegOpus(input, output, filters, onWrite, overwrite = false) {
+    // Replace file extension with .opus
+    let outOpus = output;
+    if (outOpus.includes(".")) {
+        outOpus = outOpus.substring(0, outOpus.lastIndexOf("."));
+    }
+    outOpus += ".opus";
+
+    if (overwrite || !fs.existsSync(outOpus)) {
+        await new Promise((resolve, reject) => {
+            const ff = ffmpeg()
+                .addInput(input)
+                .addOutput(outOpus)
+                .audioFilter(filters)
+                .format("opus")
+                .on("error", (err) => {
+                    return reject(new Error(err));
+                })
+                .on('end', () => {
+                    resolve();
+                });
+
+            ff.run();
+        });
+        onWrite();
+    }
+
+    return outOpus;
+}
+
+/**
  * @param {String} input
  * @param {String} output
  * @param {Number} amplify
@@ -24,9 +62,7 @@ exports.AudioCommand = AudioCommand;
  * @returns {Promise<AudioCommand[]>}
  */
 exports.convert = async (input, output, amplify, bassboost, overwrite) => {
-    const filters = [
-        "loudnorm",
-    ];
+    const filters = [];
     if (bassboost != 0) {
         filters.push("firequalizer=gain_entry='entry(0,0);entry(100," + bassboost + ");entry(350,0)'");
     }
@@ -39,34 +75,22 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
 
     for (const dir of fs.readdirSync(input, { withFileTypes: true })) {
         if (!dir.isFile()) {
+            const dirPath = join(input, dir.name);
+
             const cmd = new AudioCommand(dir.name);
 
-            for (const audio of fs.readdirSync(join(input, cmd.folder), { withFileTypes: true })) {
+            for (const audio of fs.readdirSync(dirPath, { withFileTypes: true })) {
                 if (audio.isFile()) {
-                    let dest = audio.name;
-                    if (dest.includes(".")) {
-                        dest = dest.substring(0, dest.lastIndexOf("."));
-                    }
-                    dest = output + dest + ".opus";
+                    const fileIn = join(dirPath, audio.name);
+                    const fileOut = join(output, audio.name);
 
-                    if (overwrite || !fs.existsSync(dest)) {
-                        await new Promise((resolve, reject) => {
-                            const ff = ffmpeg()
-                                .addInput(join(input, cmd.folder, audio.name))
-                                .addOutput(dest)
-                                .audioFilter(filters)
-                                .format("opus")
-                                .on("error", (err) => {
-                                    return reject(new Error(err));
-                                })
-                                .on('end', () => {
-                                    resolve();
-                                });
-
-                            ff.run();
-                        });
-                        console.log("Converted " + audio.name);
-                    }
+                    const dest = await runFFmpegOpus(
+                        fileIn, fileOut, filters,
+                        () => {
+                            console.log("Converted " + audio.name);
+                        },
+                        overwrite,
+                    );
 
                     cmd.files.push(dest);
                 }
@@ -85,6 +109,10 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
  * @param {Boolean} overwrite
  */
 exports.normalize = async (input, output, overwrite = false) => {
+    const filters = [
+        "speechnorm=e=40:c=40:t=1:i=1:l=1"
+    ];
+
     for (const dir of fs.readdirSync(input, { withFileTypes: true })) {
         if (!dir.isFile()) {
             const dirPath = join(input, dir.name);
@@ -96,48 +124,15 @@ exports.normalize = async (input, output, overwrite = false) => {
 
             for (const audio of fs.readdirSync(dirPath, { withFileTypes: true })) {
                 if (audio.isFile()) {
-                    const fileName = join(dirPath, audio.name);
+                    const fileIn = join(dirPath, audio.name);
+                    const fileOut = join(dirPathOut, audio.name);
 
-                    // Replace file extension with .opus
-                    let name = audio.name;
-                    if (name.includes(".")) {
-                        name = name.substring(0, name.lastIndexOf("."));
-                    }
-                    name += ".opus";
-
-                    const dest = join(dirPathOut, name);
-
-                    if (overwrite || !fs.existsSync(dest)) {
-                        const process = spawn("ffmpeg-normalize", [
-                            fileName,
-                            "--video-disable",
-                            "-c:a",
-                            "libopus",
-                            "--print-stats",
-                            "--quiet",
-                            "--normalization-type",
-                            "peak",
-                            "-f",
-                            "-o",
-                            dest
-                        ]);
-
-                        let peakResult;
-                        process.stdout.on("data", (chunk) => {
-                            const logged = "" + chunk;
-                            peakResult = JSON.parse(logged);
-                        });
-
-                        await new Promise((res, rej) => {
-                            process.on("exit", res);
-                            process.on("error", rej);
-                        });
-
-                        const { mean, max } = peakResult[0];
-                        const maxString = max.toFixed(1);
-
-                        console.log("Normalized " + audio.name + " (previously at " + maxString + " dB)");
-                    }
+                    await runFFmpegOpus(fileIn, fileOut, filters,
+                        () => {
+                            console.log("Normalized " + audio.name);
+                        },
+                        overwrite,
+                    );
                 }
             }
         }
