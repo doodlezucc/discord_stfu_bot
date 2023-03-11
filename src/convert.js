@@ -1,3 +1,4 @@
+const { spawn } = require("child_process");
 const ffmpeg = require("fluent-ffmpeg");
 const fs = require("fs");
 const { join } = require("path");
@@ -9,9 +10,6 @@ class AudioCommand {
 
         /** @type {string[]} */
         this.files = [];
-
-        /** @type {number} */
-        this.previousAudio = -1;
     }
 }
 
@@ -26,7 +24,7 @@ exports.AudioCommand = AudioCommand;
  * @returns {Promise<AudioCommand[]>}
  */
 exports.convert = async (input, output, amplify, bassboost, overwrite) => {
-    let filters = [
+    const filters = [
         "loudnorm",
     ];
     if (bassboost != 0) {
@@ -79,4 +77,69 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
     }
 
     return out;
+}
+
+/**
+ * @param {String} input
+ * @param {String} output
+ * @param {Boolean} overwrite
+ */
+exports.normalize = async (input, output, overwrite = false) => {
+    for (const dir of fs.readdirSync(input, { withFileTypes: true })) {
+        if (!dir.isFile()) {
+            const dirPath = join(input, dir.name);
+            const dirPathOut = join(output, dir.name);
+
+            if (!fs.existsSync(dirPathOut)) {
+                fs.mkdirSync(dirPathOut, { recursive: true });
+            }
+
+            for (const audio of fs.readdirSync(dirPath, { withFileTypes: true })) {
+                if (audio.isFile()) {
+                    const fileName = join(dirPath, audio.name);
+
+                    // Replace file extension with .opus
+                    let name = audio.name;
+                    if (name.includes(".")) {
+                        name = name.substring(0, name.lastIndexOf("."));
+                    }
+                    name += ".opus";
+
+                    const dest = join(dirPathOut, name);
+
+                    if (overwrite || !fs.existsSync(dest)) {
+                        const process = spawn("ffmpeg-normalize", [
+                            fileName,
+                            "--video-disable",
+                            "-c:a",
+                            "libopus",
+                            "--print-stats",
+                            "--quiet",
+                            "--normalization-type",
+                            "peak",
+                            "-f",
+                            "-o",
+                            dest
+                        ]);
+
+                        let peakResult;
+                        process.stdout.on("data", (chunk) => {
+                            const logged = "" + chunk;
+                            peakResult = JSON.parse(logged);
+                        });
+
+                        await new Promise((res, rej) => {
+                            process.on("exit", res);
+                            process.on("error", rej);
+                        });
+
+                        const { mean, max } = peakResult[0];
+                        const maxString = max.toFixed(1);
+
+                        console.log("Normalized " + audio.name + " (previously at " + maxString + " dB)");
+                    }
+                }
+            }
+        }
+    }
 }

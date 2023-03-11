@@ -5,16 +5,9 @@ const fs = require("fs");
 const converter = require("./convert");
 const { Connection } = require("./wheel");
 
-const audioDir = "audio/";
-if (!fs.existsSync(audioDir)) {
-    fs.mkdirSync(audioDir);
-    return console.error("No audio files available!");
-}
-
-const opusDir = "opus/";
-if (!fs.existsSync(opusDir)) {
-    fs.mkdirSync(opusDir);
-}
+const rawDir = "audio/";
+const audioDir = "audio_normalized/";
+const opusDir = "audio_ready/";
 
 const client = new Discord.Client({
     intents: [
@@ -29,6 +22,7 @@ const client = new Discord.Client({
 const {
     token,
     amp,
+    normalize,
     cowardImg,
     statsHeader
 } = require("../config.json");
@@ -50,6 +44,20 @@ function saveStats() {
 /** @type {converter.AudioCommand[]} */
 let commands;
 
+function initDirectories() {
+    if (!fs.existsSync(rawDir)) {
+        fs.mkdirSync(rawDir);
+    }
+
+    if (!fs.existsSync(audioDir)) {
+        fs.mkdirSync(audioDir);
+    }
+
+    if (!fs.existsSync(opusDir)) {
+        fs.mkdirSync(opusDir);
+    }
+}
+
 async function clearConversions() {
     for (const dirent of fs.readdirSync(opusDir, { withFileTypes: true })) {
         if (dirent.isFile() && dirent.name.endsWith(".opus")) {
@@ -64,13 +72,17 @@ async function clearConversions() {
 }
 
 async function init() {
+    initDirectories();
     //await clearConversions();
 
-    try {
-        commands = await converter.convert(audioDir, opusDir, amp, 8, false);
-    } catch (err) {
-        return console.error(err);
+    const doNormalize = normalize ?? true;
+
+    if (doNormalize) {
+        await converter.normalize(rawDir, audioDir);
+        return;
     }
+
+    commands = await converter.convert(audioDir, opusDir, amp, 8, false);
 
     loadStats();
 
