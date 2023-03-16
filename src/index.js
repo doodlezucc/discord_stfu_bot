@@ -171,6 +171,13 @@ function getConnection(guildId) {
     return connections[guildId];
 }
 
+function increasePlayCount(guildId, category) {
+    if (!(category in soundStats[guildId])) {
+        soundStats[guildId][category] = 0;
+    }
+    soundStats[guildId][category]++;
+}
+
 /** 
  * @param {Discord.Message} message
  * @param {converter.AudioCommand} cmd
@@ -214,22 +221,19 @@ async function respondPlay(message, cmd) {
         selfDeaf: false,
     });
 
+    increasePlayCount(guildId, cmd.folder);
+
     const player = Voice.createAudioPlayer();
     player.addListener("stateChange", (_oldState, newState) => {
         if (newState.status == Voice.AudioPlayerStatus.Idle) {
             connection.disconnect();
-
-            if (!(cmd.folder in soundStats[guildId])) {
-                soundStats[guildId][cmd.folder] = 0;
-            }
-            soundStats[guildId][cmd.folder]++;
 
             saveStats();
         }
     }).addListener("error", (err) => {
         connection.disconnect();
         console.error(err);
-    });
+    }).addListener();
 
     connection.subscribe(player);
     player.play(resource);
