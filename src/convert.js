@@ -16,22 +16,32 @@ class AudioCommand {
 exports.AudioCommand = AudioCommand;
 
 /**
- * Runs ffmpeg with specified filters and converts from `input` to `output` (opus format).
- * @param {String} input
- * @param {String} output
- * @param {() => any} onWrite
- * @param {String[]} filters
- * @returns {Promise<String>}
+ * Replaces the file extension of `fileName` with ".opus".
+ * @param {String} fileName
  */
-async function runFFmpegOpus(input, output, filters, onWrite, overwrite = false) {
-    // Replace file extension with .opus
-    let outOpus = output;
+function withOpusExtension(fileName) {
+    let outOpus = fileName;
     if (outOpus.includes(".")) {
         outOpus = outOpus.substring(0, outOpus.lastIndexOf("."));
     }
     outOpus += ".opus";
+    return outOpus;
+}
+
+/**
+ * Runs ffmpeg with specified filters and converts from `input` to `output` (opus format).
+ * @param {String} input
+ * @param {String} output
+ * @param {(fileName: String) => any} onWrite
+ * @param {String[]} filters
+ * @returns {Promise<String>}
+ */
+async function runFFmpegOpus(input, output, filters, onWrite, overwrite = false) {
+    const outOpus = withOpusExtension(output);
 
     if (overwrite || !fs.existsSync(outOpus)) {
+        // fs.closeSync(fs.openSync(outOpus, "w")); // Create empty file
+
         await new Promise((resolve, reject) => {
             const ff = ffmpeg()
                 .addInput(input)
@@ -47,7 +57,7 @@ async function runFFmpegOpus(input, output, filters, onWrite, overwrite = false)
 
             ff.run();
         });
-        onWrite();
+        onWrite(outOpus);
     }
 
     return outOpus;
@@ -86,7 +96,7 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
 
                     const dest = await runFFmpegOpus(
                         fileIn, fileOut, filters,
-                        () => {
+                        (opusOutput) => {
                             console.log("Converted " + audio.name);
                         },
                         overwrite,
@@ -106,9 +116,10 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
 /**
  * @param {String} input
  * @param {String} output
+ * @param {String} outputFresh
  * @param {Boolean} overwrite
  */
-exports.normalize = async (input, output, overwrite = false) => {
+exports.normalize = async (input, output, outputFresh, overwrite = false) => {
     const filters = [
         "speechnorm=e=40:c=40:t=1:i=1:l=1"
     ];
@@ -122,14 +133,34 @@ exports.normalize = async (input, output, overwrite = false) => {
                 fs.mkdirSync(dirPathOut, { recursive: true });
             }
 
+            if (outputFresh) {
+                const dirPathFresh = join(outputFresh, dir.name);
+
+                if (!fs.existsSync(dirPathFresh)) {
+                    fs.mkdirSync(dirPathFresh, { recursive: true });
+                }
+            }
+
             for (const audio of fs.readdirSync(dirPath, { withFileTypes: true })) {
                 if (audio.isFile()) {
                     const fileIn = join(dirPath, audio.name);
                     const fileOut = join(dirPathOut, audio.name);
 
                     await runFFmpegOpus(fileIn, fileOut, filters,
-                        () => {
+                        (opusOutput) => {
                             console.log("Normalized " + audio.name);
+
+                            if (outputFresh) {
+                                const fileNameOpus = withOpusExtension(audio.name);
+                                const fileOutFresh = join(outputFresh, dir.name, fileNameOpus);
+                                if (fs.existsSync(fileOutFresh)) {
+                                    fs.unlinkSync(fileOutFresh);
+                                }
+
+                                fs.copyFile(opusOutput, fileOutFresh, (err) => {
+                                    if (err) throw err;
+                                });
+                            }
                         },
                         overwrite,
                     );

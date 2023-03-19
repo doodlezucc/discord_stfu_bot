@@ -4,9 +4,11 @@ const Voice = require("@discordjs/voice");
 const fs = require("fs");
 const converter = require("./convert");
 const { Connection } = require("./wheel");
+const path = require("path");
 
 const rawDir = "audio/";
 const audioDir = "audio_normalized/";
+const freshDir = "audio_fresh/";
 const opusDir = "audio_ready/";
 
 const client = new Discord.Client({
@@ -58,24 +60,53 @@ function initDirectories() {
     }
 }
 
-async function clearConversions() {
-    for (const dirent of fs.readdirSync(opusDir, { withFileTypes: true })) {
+async function clearOpusFiles(dir) {
+    for (const dirent of fs.readdirSync(dir, { withFileTypes: true })) {
+        const direntPath = path.join(dir, dirent.name);
+
         if (dirent.isFile() && dirent.name.endsWith(".opus")) {
             await new Promise((resolve) => {
-                fs.unlink(opusDir + dirent.name, () => {
+                fs.unlink(direntPath, () => {
                     resolve();
                 });
             })
+        } else if (dirent.isDirectory()) {
+            await clearOpusFiles(direntPath);
         }
     }
+}
+
+async function clearConversions(clearNormalized) {
+    if (clearNormalized) {
+        await clearOpusFiles(audioDir);
+        console.log("Cleared normalizations");
+    }
+
+    await clearOpusFiles(opusDir);
     console.log("Cleared conversions");
 }
 
 async function init() {
+    const args = require("minimist")(process.argv.splice(2));
+    const copyFreshFiles = args._.includes("prepare");
+
+    const clearPreviousConversions = args["clear"];
+
     initDirectories();
-    // await clearConversions();
+
+    if (clearPreviousConversions) {
+        const shouldClearAll = clearPreviousConversions === "all";
+        await clearConversions(shouldClearAll);
+    }
 
     const doNormalize = normalize ?? true;
+
+    if (copyFreshFiles) {
+        await clearOpusFiles(freshDir);
+        await converter.normalize(rawDir, audioDir, freshDir);
+        console.log(`Copied freshly normalized files to "${freshDir}"`);
+        return;
+    }
 
     if (doNormalize) {
         await converter.normalize(rawDir, audioDir);
@@ -233,7 +264,7 @@ async function respondPlay(message, cmd) {
     }).addListener("error", (err) => {
         connection.disconnect();
         console.error(err);
-    }).addListener();
+    });
 
     connection.subscribe(player);
     player.play(resource);

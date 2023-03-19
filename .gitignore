@@ -1,7 +1,5 @@
 node_modules
-audio
-audio_normalized
-audio_ready
+audio*/
 
 config.json
 stats.json
