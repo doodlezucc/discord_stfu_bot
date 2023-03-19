@@ -121,7 +121,7 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
  */
 exports.normalize = async (input, output, outputFresh, overwrite = false) => {
     const filters = [
-        "speechnorm=e=40:c=40:t=1:i=1:l=1"
+        "speechnorm=e=40:c=40:t=1:i=1:l=1:r=0.0003:f=0.0003"
     ];
 
     for (const dir of fs.readdirSync(input, { withFileTypes: true })) {
