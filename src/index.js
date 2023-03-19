@@ -102,7 +102,9 @@ async function init() {
     const doNormalize = normalize ?? true;
 
     if (copyFreshFiles) {
-        await clearOpusFiles(freshDir);
+        if (clearPreviousConversions) {
+            await clearOpusFiles(freshDir);
+        }
         await converter.normalize(rawDir, audioDir, freshDir);
         console.log(`Copied freshly normalized files to "${freshDir}"`);
         return;
