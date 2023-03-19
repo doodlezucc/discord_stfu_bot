@@ -150,8 +150,12 @@ function handleMessage(message) {
     }
 
     for (const cmd of commands) {
-        if (message.content === cmd.folder) {
-            return respondPlay(message, cmd);
+        const content = message.content.toLowerCase();
+
+        if (content.startsWith(cmd.folder)) {
+            const query = content.substring(cmd.folder.length).trim();
+
+            return respondPlay(message, cmd, query);
         }
     }
 }
@@ -214,8 +218,9 @@ function increasePlayCount(guildId, category) {
 /** 
  * @param {Discord.Message} message
  * @param {converter.AudioCommand} cmd
+ * @param {String} query
 */
-async function respondPlay(message, cmd) {
+async function respondPlay(message, cmd, query) {
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
         const reply = await message.channel.send({
@@ -238,7 +243,7 @@ async function respondPlay(message, cmd) {
         return message.channel.send("need permission to join voice channels somehow.");
     }
 
-    const audio = getConnection(guildId).getSound(cmd);
+    const audio = getConnection(guildId).getSound(cmd, query);
     // console.log("Playing some sweet " + audio);
 
     const resource = Voice.createAudioResource(audio, {

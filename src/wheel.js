@@ -1,4 +1,5 @@
 const { AudioCommand } = require("./convert");
+const Discord = require("discord.js");
 
 // 20 minutes
 const timeUntilReset = 20 * 60 * 1000;
@@ -8,7 +9,6 @@ class Wheel {
      * @param {AudioCommand} cmd 
      */
     constructor(cmd) {
-        this.index = -1;
         this.cmd = cmd;
         this.lastReset = 0;
         this.wheel = cmd.files.slice();
@@ -16,10 +16,13 @@ class Wheel {
 
     reset() {
         shuffle(this.wheel);
-        this.index = 0;
     }
 
-    nextSound() {
+    /**
+     * Returns the next sound of this wheel with an optional query.
+     * @param {String} query
+     */
+    nextSound(query = "") {
         const now = Date.now();
         const diff = now - this.lastReset;
 
@@ -28,8 +31,21 @@ class Wheel {
         }
 
         this.lastReset = now;
-        this.index = (this.index + 1) % this.wheel.length;
-        return this.wheel[this.index];
+
+        const q = query.toLowerCase();
+        let result = "";
+        let resultName = "";
+        let searchesLeft = this.wheel.length;
+
+        do {
+            result = this.wheel.shift();
+            this.wheel.push(result);
+
+            resultName = Discord.basename(result);
+            searchesLeft--;
+        } while (searchesLeft >= 0 && !resultName.startsWith(q));
+
+        return result;
     }
 }
 
@@ -46,9 +62,9 @@ class Connection {
         return this.wheels[cmd.folder];
     }
 
-    getSound(cmd) {
-        let wheel = this.getWheel(cmd);
-        return wheel.nextSound();
+    getSound(cmd, query) {
+        const wheel = this.getWheel(cmd);
+        return wheel.nextSound(query);
     }
 }
 
