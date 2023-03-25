@@ -25,12 +25,13 @@ const {
     token,
     amp,
     normalize,
+    random,
     cowardImg,
     statsHeader
 } = require("../config.json");
 
 const statsPath = "./stats.json";
-let soundStats = {}
+let soundStats = {};
 
 function loadStats() {
     if (fs.existsSync(statsPath)) {
@@ -213,6 +214,47 @@ function increasePlayCount(guildId, category) {
         soundStats[guildId][category] = 0;
     }
     soundStats[guildId][category]++;
+    saveStats();
+}
+
+/**
+ * Plays a local audio file inside a given voice channel.
+ * @param {Discord.VoiceChannel} voiceChannel
+ * @param {String} audioFile
+ */
+function playVoiceFile(voiceChannel, audioFile) {
+    const guildId = voiceChannel.guildId;
+
+    const permissions = voiceChannel.permissionsFor(client.user);
+    if (!permissions.has("Connect") || !permissions.has("Speak")) {
+        throw new PermissionError();
+    }
+
+    const resource = Voice.createAudioResource(audioFile, {
+        inlineVolume: true,
+    });
+    resource.volume.setVolume(0.12);
+
+    const connection = Voice.joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: guildId,
+        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+        selfMute: false,
+        selfDeaf: false,
+    });
+
+    const player = Voice.createAudioPlayer();
+    player.addListener("stateChange", (_oldState, newState) => {
+        if (newState.status == Voice.AudioPlayerStatus.Idle) {
+            connection.disconnect();
+        }
+    }).addListener("error", (err) => {
+        connection.disconnect();
+        console.error(err);
+    });
+
+    connection.subscribe(player);
+    player.play(resource);
 }
 
 /** 
@@ -238,41 +280,27 @@ async function respondPlay(message, cmd, query) {
         soundStats[guildId] = {};
     }
 
-    const permissions = voiceChannel.permissionsFor(message.client.user);
-    if (!permissions.has("Connect") || !permissions.has("Speak")) {
-        return message.channel.send("need permission to join voice channels somehow.");
-    }
-
     const audio = getConnection(guildId).getSound(cmd, query);
     // console.log("Playing some sweet " + audio);
 
-    const resource = Voice.createAudioResource(audio, {
-        inlineVolume: true,
-    });
-    resource.volume.setVolume(0.12);
-
-    const connection = Voice.joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: guildId,
-        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-        selfMute: false,
-        selfDeaf: false,
-    });
+    try {
+        playVoiceFile(voiceChannel, audio);
+    } catch (err) {
+        if (err instanceof PermissionError) {
+            message.channel.send("need permission to join voice channels somehow.");
+        }
+        throw err;
+    }
 
     increasePlayCount(guildId, cmd.folder);
+}
 
-    const player = Voice.createAudioPlayer();
-    player.addListener("stateChange", (_oldState, newState) => {
-        if (newState.status == Voice.AudioPlayerStatus.Idle) {
-            connection.disconnect();
 
-            saveStats();
-        }
-    }).addListener("error", (err) => {
-        connection.disconnect();
-        console.error(err);
-    });
+class PermissionError extends Error {
+    constructor() {
+        super("Missing required permissions");
 
-    connection.subscribe(player);
-    player.play(resource);
+        this.name = this.constructor.name;
+        Error.captureStackTrace(this, this.constructor);
+    }
 }
