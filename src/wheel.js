@@ -20,7 +20,7 @@ class Wheel {
 
     /**
      * Returns the next sound of this wheel with an optional query.
-     * @param {String} query
+     * @param {string} query
      */
     nextSound(query = "") {
         const now = Date.now();

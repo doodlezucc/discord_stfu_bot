@@ -17,7 +17,7 @@ exports.AudioCommand = AudioCommand;
 
 /**
  * Replaces the file extension of `fileName` with ".opus".
- * @param {String} fileName
+ * @param {string} fileName
  */
 function withOpusExtension(fileName) {
     let outOpus = fileName;
@@ -30,11 +30,11 @@ function withOpusExtension(fileName) {
 
 /**
  * Runs ffmpeg with specified filters and converts from `input` to `output` (opus format).
- * @param {String} input
- * @param {String} output
- * @param {(fileName: String) => any} onWrite
- * @param {String[]} filters
- * @returns {Promise<String>}
+ * @param {string} input
+ * @param {string} output
+ * @param {(fileName: string) => any} onWrite
+ * @param {string[]} filters
+ * @returns {Promise<string>}
  */
 async function runFFmpegOpus(input, output, filters, onWrite, overwrite = false) {
     const outOpus = withOpusExtension(output);
@@ -64,8 +64,8 @@ async function runFFmpegOpus(input, output, filters, onWrite, overwrite = false)
 }
 
 /**
- * @param {String} input
- * @param {String} output
+ * @param {string} input
+ * @param {string} output
  * @param {Number} amplify
  * @param {Number} bassboost
  * @param {Boolean} overwrite
@@ -114,9 +114,9 @@ exports.convert = async (input, output, amplify, bassboost, overwrite) => {
 }
 
 /**
- * @param {String} input
- * @param {String} output
- * @param {String} outputFresh
+ * @param {string} input
+ * @param {string} output
+ * @param {string} outputFresh
  * @param {Boolean} overwrite
  */
 exports.normalize = async (input, output, outputFresh, overwrite = false) => {
