@@ -33,6 +33,11 @@ const {
 const statsPath = "./stats.json";
 let soundStats = {};
 
+/** @type {Object.<string, number>} */
+const guildTimeouts = {};
+/** @type {Object.<string, Discord.VoiceBasedChannel>} */
+const guildActiveChannel = {};
+
 function loadStats() {
     if (fs.existsSync(statsPath)) {
         soundStats = JSON.parse(fs.readFileSync(statsPath));
@@ -140,9 +145,85 @@ async function init() {
 
         handleMessage(message);
     });
+
+    if (random && random.intervalMin && random.intervalMax) {
+        client.on("voiceStateUpdate", onAnyVoiceStateChange);
+    }
 }
 
 init();
+
+/**
+ * @param {Discord.VoiceBasedChannel} voiceChannel
+ */
+function countHumanVoiceMembers(voiceChannel) {
+    const nonBots = voiceChannel.members.filter((member) => !member.user.bot);
+    return nonBots.size;
+}
+
+/**
+ * @param {Discord.VoiceState} oldState
+ * @param {Discord.VoiceState} state
+ */
+function onAnyVoiceStateChange(oldState, state) {
+    if (state.member.user.bot) return; // Don't care about bots
+
+    const oldChannel = oldState.channel;
+    const newChannel = state.channel;
+
+    if (oldChannel != newChannel) {
+        // Voice join / leave event
+
+        if (oldChannel) {
+            const membersInChannel = countHumanVoiceMembers(oldChannel);
+            const guildId = oldChannel.guildId;
+
+            if (membersInChannel == 0) {
+                // Stop timer
+                if (guildId in guildTimeouts) {
+                    const timeoutId = guildTimeouts[guildId];
+                    clearTimeout(timeoutId);
+                }
+            }
+        }
+
+        if (newChannel) {
+            const membersInChannel = countHumanVoiceMembers(newChannel);
+            const guildId = newChannel.guildId;
+
+            guildActiveChannel[guildId] = newChannel;
+
+            if (membersInChannel == 1) {
+                // Start timer
+                startTimeout(guildId, random.intervalMin, random.intervalMax);
+            }
+        }
+    }
+}
+
+function startTimeout(guildId, intervalMin, intervalMax) {
+    const minutes = intervalMin + (intervalMax - intervalMin) * Math.random();
+    const ms = minutes * 60 * 1000;
+
+    guildTimeouts[guildId] = setTimeout(() => {
+        playRandomSoundInGuild(guildId);
+        startTimeout(guildId, intervalMin, intervalMax);
+    }, ms);
+}
+
+function playRandomSoundInGuild(guildId) {
+    const voiceChannel = guildActiveChannel[guildId];
+
+    const allAudioFiles = getAllAudioFiles();
+    const index = Math.floor(allAudioFiles.length * Math.random());
+
+    const audioFile = allAudioFiles[index];
+    playVoiceFile(voiceChannel, audioFile);
+}
+
+function getAllAudioFiles() {
+    return commands.flatMap((cmd) => cmd.files);
+}
 
 /** @param {Discord.Message} message */
 function handleMessage(message) {
@@ -219,8 +300,8 @@ function increasePlayCount(guildId, category) {
 
 /**
  * Plays a local audio file inside a given voice channel.
- * @param {Discord.VoiceChannel} voiceChannel
- * @param {String} audioFile
+ * @param {Discord.VoiceBasedChannel} voiceChannel
+ * @param {string} audioFile
  */
 function playVoiceFile(voiceChannel, audioFile) {
     const guildId = voiceChannel.guildId;
@@ -260,7 +341,7 @@ function playVoiceFile(voiceChannel, audioFile) {
 /** 
  * @param {Discord.Message} message
  * @param {converter.AudioCommand} cmd
- * @param {String} query
+ * @param {string} query
 */
 async function respondPlay(message, cmd, query) {
     const voiceChannel = message.member.voice.channel;
