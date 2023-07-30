@@ -180,10 +180,7 @@ function onAnyVoiceStateChange(oldState, state) {
 
             if (membersInChannel == 0) {
                 // Stop timer
-                if (guildId in guildTimeouts) {
-                    const timeoutId = guildTimeouts[guildId];
-                    clearTimeout(timeoutId);
-                }
+                stopTimeout(guildId);
             }
         }
 
@@ -193,7 +190,7 @@ function onAnyVoiceStateChange(oldState, state) {
 
             guildActiveChannel[guildId] = newChannel;
 
-            if (membersInChannel == 1) {
+            if (membersInChannel >= 1 && !hasActiveTimeout(guildId)) {
                 // Start timer
                 startTimeout(guildId, random.intervalMin, random.intervalMax);
             }
@@ -201,9 +198,25 @@ function onAnyVoiceStateChange(oldState, state) {
     }
 }
 
+function hasActiveTimeout(guildId) {
+    return guildId in guildTimeouts;
+}
+
+function stopTimeout(guildId) {
+    if (hasActiveTimeout(guildId)) {
+        const timeoutId = guildTimeouts[guildId];
+        clearTimeout(timeoutId);
+        delete timeoutId;
+    }
+}
+
 function startTimeout(guildId, intervalMin, intervalMax) {
     const minutes = intervalMin + (intervalMax - intervalMin) * Math.random();
     const ms = minutes * 60 * 1000;
+
+    if (hasActiveTimeout(guildId)) {
+        stopTimeout(guildId);
+    }
 
     guildTimeouts[guildId] = setTimeout(() => {
         playRandomSoundInGuild(guildId);
