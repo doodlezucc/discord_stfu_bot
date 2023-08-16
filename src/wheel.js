@@ -11,18 +11,14 @@ class Wheel {
     constructor(cmd) {
         this.cmd = cmd;
         this.lastReset = 0;
-        this.wheel = cmd.files.slice();
+        this.wheel = [...cmd.files];
     }
 
     reset() {
         shuffle(this.wheel);
     }
 
-    /**
-     * Returns the next sound of this wheel with an optional query.
-     * @param {string} query
-     */
-    nextSound(query = "") {
+    resetIfNecessary() {
         const now = Date.now();
         const diff = now - this.lastReset;
 
@@ -31,22 +27,94 @@ class Wheel {
         }
 
         this.lastReset = now;
+    }
 
-        const q = query.toLowerCase();
-        let result = "";
-        let resultName = "";
-        let searchesLeft = this.wheel.length;
+    /**
+     * Returns all files in this wheel mapped to their query score.
+     * @param {string[]} queryParts
+     */
+    computeScores(queryParts) {
+        /** @type {Map<string, number>} */
+        const scores = new Map();
 
-        do {
-            result = this.wheel.shift();
+        for (const file of this.wheel) {
+            scores.set(file, computeScore(Discord.basename(file), queryParts));
+        }
+
+        return scores;
+    }
+
+    /**
+     * Returns the next sound of this wheel with an optional query.
+     * @param {string} query
+     */
+    nextSound(query = "") {
+        this.resetIfNecessary();
+
+        if (!query.length) {
+            const result = this.wheel.shift();
+            this.wheel.push(result);
+            return result;
+        }
+
+        const queryParts = query.toLowerCase().split(/\W+/gm);
+        const fileScores = this.computeScores(queryParts);
+        const bestScoring = getBestScoring(fileScores);
+
+        for (let i = 0; i < this.wheel.length; i++) {
+            const result = this.wheel.shift();
             this.wheel.push(result);
 
-            resultName = Discord.basename(result);
-            searchesLeft--;
-        } while (searchesLeft >= 0 && !resultName.startsWith(q));
-
-        return result;
+            if (bestScoring.includes(result)) {
+                return result;
+            }
+        }
     }
+}
+
+/**
+ * Returns the best scoring items of `map`.
+ * @param {Map<string, number>} map
+ */
+function getBestScoring(map) {
+    let maxScore = 0;
+    for (const score of map.values()) {
+        if (score > maxScore) {
+            maxScore = score;
+        }
+    }
+
+    const result = [];
+    for (const entry of map.entries()) {
+        const score = entry[1];
+
+        if (score == maxScore) {
+            const item = entry[0];
+            result.push(item);
+        }
+    }
+
+    return result;
+}
+
+/**
+ * Returns true if any part of `query` is included in the file name.
+ * 
+ * @param {string} fileName
+ * @param {string[]} queryParts Query, split at whitespaces, all lowercase.
+ * @returns {number}
+ */
+function computeScore(fileName, queryParts) {
+    const fileNameLower = fileName.toLowerCase();
+    let score = 0;
+
+    for (const queryPart of queryParts) {
+        if (fileNameLower.includes(queryPart)) {
+            score++;
+        }
+    }
+
+    return score;
 }
 
 class Connection {
